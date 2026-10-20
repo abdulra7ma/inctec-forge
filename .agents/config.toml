@@ -1,0 +1,100 @@
+# Agent system configuration — tool- and model-agnostic.
+# Roles declare a tier ("reasoning" | "fast"); each runtime maps tiers to concrete models.
+# Empty model string = use that CLI's own default model.
+
+default_runtime = "claude"          # used by the factory when a role has no override
+
+# ---------------------------------------------------------------------------
+# Runtimes: how to invoke each agent CLI headlessly.
+# Placeholders: {prompt_file} {model_flag} {mode_flags}
+#   {model_flag} expands to model_flag_template with {model}, or "" if model is empty.
+# {mode_flags} = read_only or write: extra flags for read-only roles (reviewers) vs writing roles (builder).
+# CLI flags change between versions — verify with `<cli> --help` after upgrading.
+# ---------------------------------------------------------------------------
+[runtimes.claude]
+command = "claude -p \"$(cat {prompt_file})\" {model_flag} {mode_flags} --output-format text"
+model_flag_template = "--model {model}"
+read_only = "--permission-mode plan"
+write = "--permission-mode acceptEdits"
+models = { reasoning = "opus", fast = "sonnet" }
+
+[runtimes.codex]
+command = "codex exec {model_flag} {mode_flags} - < {prompt_file}"
+model_flag_template = "-m {model}"
+read_only = "--sandbox read-only"
+write = "--sandbox workspace-write"
+models = { reasoning = "", fast = "" }
+
+[runtimes.gemini]
+command = "gemini -p \"$(cat {prompt_file})\" {model_flag} {mode_flags}"
+model_flag_template = "-m {model}"
+read_only = ""
+write = "--yolo"
+models = { reasoning = "", fast = "" }
+
+[runtimes.opencode]
+command = "opencode run {model_flag} {mode_flags} \"$(cat {prompt_file})\""
+model_flag_template = "-m {model}"
+read_only = ""
+write = ""
+models = { reasoning = "", fast = "" }     # e.g. "anthropic/claude-opus-…", "openai/…", "ollama/qwen…"
+
+[runtimes.aider]
+command = "aider --yes-always --no-auto-commits {model_flag} {mode_flags} --message-file {prompt_file}"
+model_flag_template = "--model {model}"
+read_only = "--dry-run"
+write = ""
+models = { reasoning = "", fast = "" }
+
+# Offline stub used for tests and demos — no model calls.
+[runtimes.stub]
+command = "python3 factory/stub_agent.py {prompt_file}"
+model_flag_template = ""
+read_only = ""
+write = ""
+models = { reasoning = "", fast = "" }
+
+# ---------------------------------------------------------------------------
+# Per-role runtime overrides — mix vendors freely, e.g. build with one, review with another
+# (a reviewer from a different model family catches different mistakes).
+# ---------------------------------------------------------------------------
+[roles]
+# builder = "claude"
+# code-reviewer = "codex"
+# security-reviewer = "claude"
+# ux-reviewer = "gemini"
+
+# ---------------------------------------------------------------------------
+# Factory pipeline
+# ---------------------------------------------------------------------------
+[factory]
+base_branch = "main"
+max_fix_rounds = 2
+check_command = "make check"
+auto_merge_tiers = ["T0"]           # approver APPROVE + tier in this list → PR with auto-merge. Everything else → needs-human.
+open_pr = true                      # false = keep branch local (useful while trialling)
+agent_timeout_seconds = 1800
+
+[[factory.reviewers]]
+role = "code-reviewer"
+when = ["**"]
+
+[[factory.reviewers]]
+role = "security-reviewer"
+when = ["**"]
+
+[[factory.reviewers]]
+role = "ux-reviewer"
+when = ["frontend/**", "src/**", "web/**", "**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css"]
+
+[[factory.reviewers]]
+role = "ui-reviewer"
+when = ["frontend/**", "src/**", "web/**", "**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css"]
+
+# ---------------------------------------------------------------------------
+# Sync targets: where scripts/sync_agents.py writes tool-specific copies.
+# ---------------------------------------------------------------------------
+[sync]
+claude_agents = true                # .claude/agents/<role>.md with model + tools
+skill_mirrors = [".claude/skills"]  # add e.g. ".codex/skills", ".gemini/skills" if your tool reads skills elsewhere
+gemini_context = true               # .gemini/settings.json → contextFileName = AGENTS.md

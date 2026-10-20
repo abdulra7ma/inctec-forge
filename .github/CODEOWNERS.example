@@ -1,0 +1,14 @@
+# Rename to .github/CODEOWNERS and replace the GitHub handles/teams.
+# T2/T3 areas must have an owner so "code-owner review" is enforceable via branch protection.
+*                         @inctec/backend-leads
+/app/                     @inctec/backend
+/migrations/              @inctec/backend-leads
+/app/core/security.py     @inctec/backend-leads @inctec/security
+/app/**/auth/             @inctec/backend-leads @inctec/security
+/frontend/                @inctec/frontend
+/infra/  /deploy/         @inctec/devops
+/.github/workflows/       @inctec/devops
+/Dockerfile*              @inctec/devops
+/.claude/                 @inctec/eng-lead
+/docs/engineering/        @inctec/eng-lead
+/scripts/risk_tier.py     @inctec/eng-lead

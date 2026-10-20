@@ -1,0 +1,92 @@
+{
+  "protected_branches": [
+    "main",
+    "master",
+    "release/*",
+    "production"
+  ],
+  "T3": {
+    "paths": [
+      "infra/prod/**",
+      "deploy/prod/**",
+      "**/*.tfvars",
+      "**/secrets/**",
+      "**/*.pem",
+      "**/*.key",
+      "**/payments/**",
+      "**/billing/**",
+      ".env*",
+      "**/.env*"
+    ],
+    "diff_patterns": [
+      "\\bDROP\\s+(TABLE|COLUMN|SCHEMA|DATABASE)\\b",
+      "\\bTRUNCATE\\b",
+      "op\\.drop_(table|column)\\(",
+      "\\bDELETE\\s+FROM\\s+\\w+\\s*;"
+    ]
+  },
+  "T2": {
+    "paths": [
+      "migrations/**",
+      "**/alembic/**",
+      "**/migrations/**",
+      "**/models.py",
+      "**/auth/**",
+      "**/security/**",
+      "**/core/security.py",
+      "**/permissions*",
+      "infra/**",
+      "deploy/**",
+      "k8s/**",
+      "helm/**",
+      "terraform/**",
+      ".github/workflows/**",
+      "Dockerfile*",
+      "**/Dockerfile*",
+      "docker-compose*.yml",
+      "compose*.yml",
+      "pyproject.toml",
+      "uv.lock",
+      "poetry.lock",
+      "requirements*.txt",
+      "package.json",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      "yarn.lock",
+      "openapi*.json",
+      "openapi*.yaml",
+      "**/events/schemas/**",
+      "CODEOWNERS",
+      ".github/CODEOWNERS",
+      "app/workflows/**",
+      "**/workflows/*/workflow.py",
+      "**/worker/celery_app.py",
+      "observability/alerts/**",
+      "observability/otel-collector.yaml",
+      ".agents/**",
+      ".claude/settings.json",
+      ".claude/hooks/**",
+      "scripts/risk_tier.py",
+      "scripts/githooks/**",
+      "factory/**",
+      "AGENTS.md"
+    ],
+    "max_changed_lines": 400
+  },
+  "T0": {
+    "paths": [
+      "docs/**",
+      "**/*.md",
+      "tests/**",
+      "**/tests/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/test_*.py",
+      "**/*_test.py",
+      "src/api/generated/**",
+      ".gitignore",
+      ".editorconfig"
+    ]
+  }
+}

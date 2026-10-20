@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Tool-independent push gate: nobody pushes to protected branches; force-pushes by agents are refused.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+PROTECTED=$(python3 -c "import json;print(' '.join(json.load(open('$ROOT/.agents/risk-rules.json'))['protected_branches']))")
+ZERO=0000000000000000000000000000000000000000
+IS_AGENT=0
+[[ "${AI_AGENT:-}" == "1" || -n "${CLAUDECODE:-}" || -n "${CODEX_SANDBOX:-}" || -n "${GEMINI_CLI:-}" ]] && IS_AGENT=1
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch="${remote_ref#refs/heads/}"
+  for p in $PROTECTED; do
+    # shellcheck disable=SC2053
+    if [[ "$branch" == $p ]]; then
+      echo "✋ Push to protected branch '$branch' refused. Open a PR instead." >&2
+      exit 1
+    fi
+  done
+  # Non-fast-forward push by an agent = rewriting history.
+  if [[ $IS_AGENT == 1 && "$remote_sha" != "$ZERO" && "$local_sha" != "$ZERO" ]]; then
+    if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      echo "✋ Agent force-push to '$branch' refused (non-fast-forward)." >&2
+      exit 1
+    fi
+  fi
+done
+exit 0

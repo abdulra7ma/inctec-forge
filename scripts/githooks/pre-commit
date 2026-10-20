@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Tool-independent commit gate. Installed via: git config core.hooksPath scripts/githooks
+# - Nobody commits directly on protected branches.
+# - Agents (any vendor) may not commit T3 changes. Agent sessions are detected by AI_AGENT=1
+#   (set by the factory; set it in your agent tool's env too) or known agent env vars.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+PROTECTED=$(python3 -c "import json;print(' '.join(json.load(open('$ROOT/.agents/risk-rules.json'))['protected_branches']))")
+for p in $PROTECTED; do
+  # shellcheck disable=SC2053
+  if [[ "$BRANCH" == $p ]]; then
+    echo "✋ Direct commits to '$BRANCH' are not allowed. Create a branch: git switch -c feat/<slug>" >&2
+    exit 1
+  fi
+done
+
+if [[ "${AI_AGENT:-}" == "1" || -n "${CLAUDECODE:-}" || -n "${CODEX_SANDBOX:-}" || -n "${GEMINI_CLI:-}" ]]; then
+  TIER_JSON="$(python3 "$ROOT/scripts/risk_tier.py" --staged --json || true)"
+  if echo "$TIER_JSON" | grep -q '"tier": "T3"'; then
+    echo "✋ Agent commit blocked: staged change is tier T3." >&2
+    echo "$TIER_JSON" >&2
+    echo "Agents propose T3 changes (plan/patch in docs/design/); a human commits and executes them." >&2
+    exit 1
+  fi
+fi
+
+# Delegate to the pre-commit framework (ruff, gitleaks, …) if it's installed.
+if command -v pre-commit >/dev/null 2>&1 && [[ -f "$ROOT/.pre-commit-config.yaml" ]]; then
+  exec pre-commit run --hook-stage pre-commit
+fi

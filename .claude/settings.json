@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make check)", "Bash(make test)", "Bash(make fmt)", "Bash(make lint)", "Bash(make typecheck)",
+      "Bash(uv run pytest:*)", "Bash(uv run ruff:*)", "Bash(uv run mypy:*)", "Bash(uv sync:*)",
+      "Bash(pnpm lint:*)", "Bash(pnpm typecheck:*)", "Bash(pnpm test:*)",
+      "Bash(python3 scripts/risk_tier.py:*)",
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git branch:*)",
+      "Bash(git checkout -b:*)", "Bash(git switch -c:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git fetch:*)",
+      "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)",
+      "Bash(docker compose ps:*)", "Bash(docker compose logs:*)",
+      "Bash(terraform plan:*)", "Bash(terraform fmt:*)", "Bash(terraform validate:*)", "Bash(kubectl get:*)", "Bash(kubectl describe:*)", "Bash(kubectl diff:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)", "Bash(gh pr create:*)", "Bash(uv add:*)", "Bash(pnpm add:*)", "Bash(npm install:*)",
+      "Bash(docker compose up:*)", "Bash(docker compose down:*)", "Bash(make migration:*)", "Bash(alembic upgrade:*)"
+    ],
+    "deny": [
+      "Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)",
+      "Read(./**/secrets/**)", "Read(./**/*.pem)", "Read(./**/*.key)",
+      "Edit(./.env*)", "Write(./.env*)",
+      "Bash(git push --force:*)", "Bash(git push -f:*)", "Bash(gh pr merge:*)",
+      "Bash(terraform apply:*)", "Bash(terraform destroy:*)", "Bash(kubectl delete:*)", "Bash(kubectl apply:*)",
+      "Bash(alembic downgrade:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard_bash.py", "timeout": 30 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format_on_edit.py", "timeout": 60 }]
+      }
+    ]
+  }
+}

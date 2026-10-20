@@ -1,0 +1,91 @@
+# Pin third-party actions by commit SHA in your repo (tags shown here for readability).
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+      - run: uv sync --frozen
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy app
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: app_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/app_test
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true }
+      - run: uv sync --frozen
+      - name: Migrations round-trip
+        run: uv run alembic upgrade head && uv run alembic downgrade -1 && uv run alembic upgrade head
+      - run: uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=85
+
+  agents-sync:
+    # Generated tool-specific copies (.claude/agents, .claude/skills, .gemini) must match .agents/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 scripts/sync_agents.py --check || (echo "::error::Run 'python3 scripts/sync_agents.py' and commit the result"; exit 1)
+
+  risk-tier:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Classify
+        id: tier
+        run: |
+          set +e
+          python3 scripts/risk_tier.py --base origin/${{ github.base_ref }} --json > tier.json
+          cat tier.json
+          echo "tier=$(python3 -c 'import json;print(json.load(open("tier.json"))["tier"])')" >> "$GITHUB_OUTPUT"
+      - name: Label PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          TIER: ${{ steps.tier.outputs.tier }}
+        run: |
+          for t in T0 T1 T2 T3; do gh label create "tier:$t" --force >/dev/null 2>&1 || true; done
+          for t in T0 T1 T2 T3; do [ "tier:$t" != "tier:$TIER" ] && gh pr edit "$PR" --remove-label "tier:$t" >/dev/null 2>&1 || true; done
+          gh pr edit "$PR" --add-label "tier:$TIER"
+      - name: Enforce design note for T2/T3
+        if: steps.tier.outputs.tier == 'T2' || steps.tier.outputs.tier == 'T3'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "$BODY" | grep -qiE "docs/design/|docs/adr/" || {
+            echo "::error::Tier ${{ steps.tier.outputs.tier }} PRs must link a design note (docs/design/...) or ADR in the description."; exit 1; }

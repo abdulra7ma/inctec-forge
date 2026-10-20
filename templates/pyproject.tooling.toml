@@ -1,0 +1,30 @@
+# Merge these sections into your pyproject.toml.
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RET", "ARG", "PTH", "ASYNC", "S", "DTZ", "T20", "ERA", "PL", "RUF", "FAST"]
+ignore = ["PLR0913"]  # too-many-args is reviewed by humans, not enforced
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "ARG"]
+
+[tool.ruff.lint.pylint]
+max-branches = 10
+max-statements = 40
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers"
+markers = ["flaky: quarantined, must have a ticket"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
