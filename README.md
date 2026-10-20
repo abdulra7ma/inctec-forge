@@ -1,49 +1,60 @@
 # IncTec Forge
 
-IncTec's engineering system. Drop it into any repo and an engineer — human or agent, using **any** coding tool and **any** model — can start
-building immediately with the same taste, workflow, toolchain, and clear rules about what agents may do alone.
+IncTec's engineering guideline, in a form both people and coding agents can follow. Install it into any repo, and an
+engineer using **any** coding tool and **any** model can start building immediately — with the same taste, workflow,
+toolchain, and clear rules about what agents may do alone and what needs a human.
 
-## Install
+## Install — one command
+
+From the root of your project repo, name the agent(s) you use:
+
 ```bash
-./install.sh /path/to/your/repo     # never overwrites; conflicts are written as *.devkit for manual merge
+bash <(gh api repos/abdulra7ma/inctec-forge/contents/bootstrap.sh -H "Accept: application/vnd.github.raw") --agent claude
 ```
-Commit the result on a branch and open a PR — the git hooks it installs already refuse direct commits to `main`.
 
-## Vendor-neutral by design
+| `--agent` | What you get on top of the core |
+|---|---|
+| `claude` | `CLAUDE.md`, 13 sub-agents, slash-command skills, shell-command guard hook |
+| `codex` · `cursor` · `copilot` · `opencode` | nothing extra — they read `AGENTS.md` and `.agents/skills/` natively |
+| `gemini` | `.gemini/settings.json` so Gemini CLI loads `AGENTS.md` |
+| `aider` | `.aider.conf.yml` that loads `AGENTS.md` |
+
+Combine with commas (`--agent claude,cursor`), or leave it out to be asked. The installer:
+1. copies the core system — never overwriting your files (conflicts are saved as `*.forge-new`);
+2. builds only the adapters your agent(s) need;
+3. turns on the git-hook guardrails;
+4. **commits it all on branch `chore/forge-setup`** → push and open a PR.
+
+Already cloned the forge? `python3 path/to/inctec-forge/install.py --agent claude`.
+Update an existing repo to the latest forge: same command with `--update`.
+
+## Learn
+| | |
+|---|---|
+| [Getting started](docs/guides/getting-started.md) | install, first feature, daily use in each tool, the factory |
+| [Writing skills and roles](docs/guides/writing-skills-and-roles.md) | teach the agents something new; borrow from public libraries |
+| [Building your own agent system](docs/guides/building-your-own-agent-system.md) | the design principles behind Forge, and how to extend it |
+| [Reading list](docs/guides/reading-list.md) | standards, public skills libraries, the essential essays, stack docs |
+| [Contributing](CONTRIBUTING.md) | add a skill, fix a rule, improve the guideline — 10-minute PRs welcome |
+
+## What's inside
 ```
-AGENTS.md                ← the constitution. Read natively by Codex, Cursor, Copilot, opencode, Gemini (via .gemini/settings.json), …
-CLAUDE.md                ← one line: @AGENTS.md (+ Claude notes)
+AGENTS.md                 the constitution every agent reads first (stack, non-negotiables, loop, tiers)
 .agents/
-  roles/*.md             ← 13 role prompts with neutral frontmatter: tier (reasoning|fast), access (read|write|docs)
-  skills/*/SKILL.md      ← 15 skills in the open SKILL.md format
-  config.toml            ← runtimes (claude, codex, gemini, opencode, aider, stub), tier→model per runtime, per-role overrides, factory settings
-  risk-rules.json        ← what makes a change T0/T1/T2/T3
-scripts/sync_agents.py   ← generates .claude/agents, .claude/skills, .gemini/settings.json (CI fails on drift)
+  roles/                  13 roles: spec-writer, architect, griller, builder, backend/frontend/devops/test engineers,
+                          code/security/ux/ui reviewers, approver
+  skills/                 15 skills (open SKILL.md format) — workflow: build-feature, grill, design-doc, review, ship,
+                          debug, factory · domain: fastapi-backend, postgres-migrations, background-work (Celery/Temporal),
+                          testing, frontend, devops, observability, system-design
+  config.toml             your agents, tool CLIs, tier → model mapping, per-role overrides, factory settings
+  risk-rules.json         what makes a change T0 / T1 / T2 / T3
+docs/engineering/         autonomy policy · taste · decision-making · stage-by-stage toolchain
+docs/guides/              the guides above
+factory/                  unattended pipeline: spec → build ⇄ parallel reviews → approver → merge | needs-human
+scripts/                  risk_tier.py · sync_agents.py · githooks/
+templates/                Makefile, dev compose (Postgres, Redis, Celery, Temporal, Grafana/VictoriaMetrics/Loki/Tempo), CI
+install.py · bootstrap.sh the installer
 ```
-Edit only `.agents/` and `AGENTS.md`, then run `make agents-sync`. Swap models by editing one line in `config.toml`.
-Mix vendors per role, e.g. build with Claude and review with Codex — a different model family catches different mistakes.
-
-## The software factory
-```
-feature → spec-writer → builder ⇄ reviewers [code · security · ux* · ui*]  (max 2 fix rounds)
-                                      → approver ─┬─ APPROVE + tier allows (T0) → PR with auto-merge (CI + branch protection still gate it)
-                                                  └─ ESCALATE / T1+ / blocked   → draft PR labelled factory:needs-human
-* only when frontend files change
-```
-```bash
-make factory f="Add status filter to GET /devices"      # or: python3 factory/run.py new "..." --runtime codex
-make factory-status                                      # what's running, what needs a human and why
-python3 factory/run.py approve <run-id>                  # HUMAN ONLY (refuses agent sessions)
-python3 factory/run.py new "smoke test" --runtime stub   # offline dry run, no model calls
-```
-- Each run gets its own **git worktree + branch**, so several features can run in parallel.
-- The **orchestrator owns facts** (runs `make check`, computes the tier, builds the diff); agents own judgment.
-  Green reviews never override red checks.
-- The approver **cannot override policy**: only tiers in `auto_merge_tiers` (default `["T0"]`) auto-merge.
-- A builder that tries to commit a T3 change (e.g. `DROP COLUMN`) is stopped by the git hook; the change is saved as `uncommittable.patch` for a human.
-- Everything is recorded in `.factory/runs/<id>/` (prompts, logs, reviews per round, approver decision).
-- Interactive alternative: the `factory` skill runs the same pipeline with your tool's sub-agents.
-- CLI flags in `config.toml` differ between agent tools and change across versions — check `<cli> --help` after upgrades.
 
 ## Autonomy tiers — enforced in every tool
 | Tier | Example | Agent | Human |
@@ -53,31 +64,13 @@ python3 factory/run.py new "smoke test" --runtime stub   # offline dry run, no m
 | T2 | migrations, auth, contracts, Temporal workflows, deps, CI, infra, agent config, >400 lines | design note + draft PR | code owner |
 | T3 | prod infra, secrets, DROP/TRUNCATE, payments | propose only | commits & executes |
 
-Layers: **git hooks** (`scripts/githooks/`, work with any tool; agents are detected via `AI_AGENT=1` or known agent env vars, so
-set `AI_AGENT=1` in any agent tool that isn't auto-detected) · **CI** (`risk-tier` labels PRs and requires design notes for T2+;
-`agents-sync` drift check) · **GitHub branch protection** · tool-specific extras (`.claude/hooks/guard_bash.py` blocks destructive shell commands before they run).
+Enforced by git hooks (any tool), CI (`risk-tier`, `agents-sync`), GitHub branch protection, and tool-specific extras.
 
-## Stack coverage — `docs/engineering/toolchain.md`
-Plan → develop → CI → test → staging → production → monitor → incident, with the default and allowed-alternative tool per stage.
-- **Background work** skill: BackgroundTasks vs **Celery** vs **Temporal** decision table and production patterns (idempotency, retries, workflow determinism and versioning, testing).
-- **Observability** skill: OpenTelemetry → **VictoriaMetrics / Loki / Tempo → Grafana**, Sentry, SLO burn-rate alerting, dashboards and alerts as code.
-- `docker-compose.dev.yml`: `make dev` (app, Celery worker, Postgres, Redis) · `make dev-obs` (+ full Grafana stack, datasources pre-wired so logs ↔ traces ↔ metrics link) · `make dev-temporal` (+ Temporal and its UI).
-
-## Contents
-| Path | Purpose |
-|---|---|
-| `AGENTS.md` | Constitution: stack, non-negotiables, skills, roles, loop, tiers, when to ask |
-| `docs/engineering/` | `autonomy.md`, `taste.md`, `decision-making.md`, `toolchain.md` |
-| `docs/adr/`, `docs/design/` | ADR and design-note templates (specs go to `docs/specs/`) |
-| `.agents/roles/` | spec-writer, architect, griller, builder, backend/frontend/devops/test engineers, code/security/ux/ui reviewers, approver |
-| `.agents/skills/` | workflow: build-feature, grill, design-doc, review, ship, debug, factory · domain: fastapi-backend, postgres-migrations, background-work, testing, frontend, devops, observability, system-design |
-| `factory/` | `run.py` orchestrator + `stub_agent.py` for offline tests |
-| `scripts/` | `risk_tier.py`, `sync_agents.py`, `githooks/` |
-| `.github/` | CI, PR template, CODEOWNERS example |
-| `templates/` | Makefile, compose stack, observability configs, ruff/mypy/pytest config, pre-commit |
-
-## Rolling it out
-1. Week 1: install in one active repo. Leads run tasks through `build-feature`; try the factory on T0/T1 tickets.
-2. Week 2: tune `risk-rules.json` from real misclassifications; choose models per role in `config.toml`.
-3. Week 3+: roll out to other repos; weekly 30-minute taste review of 2 merged PRs.
-4. Same review comment twice → it becomes a line in `taste.md` or a skill. That's how the system learns.
+## The factory
+```bash
+make factory f="Add a ?status= filter to GET /devices"   # any runtime: claude, codex, gemini, opencode, aider
+make factory-status
+python3 factory/run.py approve <run-id>                  # human only
+```
+Each run gets its own worktree and branch. The orchestrator runs the checks and computes the tier itself; the approver
+can't override policy — by default only T0 auto-merges. Mix vendors per role in `.agents/config.toml`.

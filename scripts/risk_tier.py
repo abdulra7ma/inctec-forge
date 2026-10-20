@@ -44,10 +44,16 @@ def matches(path: str, patterns: list[str]) -> str | None:
     return None
 
 
-def added_lines(diff_text: str) -> str:
-    return "\n".join(
-        line[1:] for line in diff_text.splitlines() if line.startswith("+") and not line.startswith("+++")
-    )
+def added_lines(diff_text: str, skip: list[str]) -> str:
+    """Added lines from the diff, excluding files matching `skip` (docs/prose, where words like DROP TABLE are harmless)."""
+    out, current_skipped = [], False
+    for line in diff_text.splitlines():
+        if line.startswith("+++ "):
+            path = line[4:].removeprefix("b/")
+            current_skipped = path == "/dev/null" or matches(path, skip) is not None
+        elif line.startswith("+") and not current_skipped:
+            out.append(line[1:])
+    return "\n".join(out)
 
 
 def classify(files: list[str], changed_lines: int, added: str, rules: dict) -> tuple[int, list[str]]:
@@ -96,7 +102,8 @@ def main() -> int:
         parts = row.split("\t")
         if len(parts) == 3 and parts[0].isdigit():
             changed += int(parts[0]) + int(parts[1])
-    tier, reasons = classify(sorted(set(files)), changed, added_lines(git("diff", *d)), rules)
+    prose = rules["T3"].get("diff_patterns_ignore", ["**/*.md", "docs/**", ".agents/skills/**", ".agents/roles/**"])
+    tier, reasons = classify(sorted(set(files)), changed, added_lines(git("diff", *d), prose), rules)
 
     if a.json:
         print(json.dumps({"tier": f"T{tier}", "reasons": reasons, "files": len(set(files)), "changed_lines": changed}))

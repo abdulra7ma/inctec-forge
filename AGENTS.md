@@ -71,3 +71,7 @@ Delete code you don't need. Optimise for the engineer paged at 2 a.m. Full versi
 ## Where knowledge lives
 `docs/engineering/` (taste, autonomy, decisions, toolchain) · `docs/adr/` · `docs/design/` · `docs/specs/` ·
 `.agents/` (roles, skills, config, risk rules) · `factory/` (unattended pipeline)
+
+## Learning and contributing
+Guides (getting started, writing skills/roles, system design, reading list) and the contribution guide live in the
+IncTec Forge repo: https://github.com/abdulra7ma/inctec-forge — improve the system there, then `python3 install.py --update`.

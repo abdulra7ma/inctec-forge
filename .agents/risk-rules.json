@@ -23,6 +23,18 @@
       "\\bTRUNCATE\\b",
       "op\\.drop_(table|column)\\(",
       "\\bDELETE\\s+FROM\\s+\\w+\\s*;"
+    ],
+    "diff_patterns_ignore": [
+      "**/*.md",
+      "docs/**",
+      ".agents/skills/**",
+      ".agents/roles/**",
+      ".agents/risk-rules.json",
+      ".claude/skills/**",
+      ".claude/agents/**",
+      "scripts/risk_tier.py",
+      "factory/stub_agent.py",
+      ".claude/hooks/guard_bash.py"
     ]
   },
   "T2": {

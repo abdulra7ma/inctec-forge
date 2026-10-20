@@ -92,9 +92,14 @@ role = "ui-reviewer"
 when = ["frontend/**", "src/**", "web/**", "**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css"]
 
 # ---------------------------------------------------------------------------
-# Sync targets: where scripts/sync_agents.py writes tool-specific copies.
+# Which coding agents this repo is set up for. install.py --agent writes this list;
+# scripts/sync_agents.py builds the adapters each one needs (see its docstring).
+# Supported: claude, codex, gemini, cursor, copilot, opencode, aider
 # ---------------------------------------------------------------------------
 [sync]
-claude_agents = true                # .claude/agents/<role>.md with model + tools
-skill_mirrors = [".claude/skills"]  # add e.g. ".codex/skills", ".gemini/skills" if your tool reads skills elsewhere
-gemini_context = true               # .gemini/settings.json → contextFileName = AGENTS.md
+agents = ["claude", "codex", "gemini", "cursor", "copilot", "opencode", "aider"]
+extra_skill_mirrors = []            # extra dirs to copy skills into, if a tool needs one not listed above
+
+# Where this system comes from — used by install.py --update and linked from AGENTS.md
+[forge]
+repo = "https://github.com/abdulra7ma/inctec-forge"
